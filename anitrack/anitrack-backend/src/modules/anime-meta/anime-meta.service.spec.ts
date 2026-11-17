@@ -1,0 +1,147 @@
+import { Test } from '@nestjs/testing';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { ConfigService } from '@nestjs/config';
+import { getModelToken } from '@nestjs/mongoose';
+import { AnimeMetaService } from './anime-meta.service';
+import { AnimeMeta } from './schemas/anime-meta.schema';
+import { AnimeMirror } from '../bee/schemas/anime-mirror.schema';
+import { BeeService } from '../bee/bee.service';
+
+describe('AnimeMetaService (cache-aside)', () => {
+  const malId = 52991;
+
+  let svc: AnimeMetaService;
+  let model: {
+    findOne: jest.Mock;
+    create: jest.Mock;
+  };
+  let mirrorModel: {
+    find: jest.Mock;
+    findOne: jest.Mock;
+  };
+
+  beforeEach(async () => {
+    model = {
+      findOne: jest.fn(),
+      create: jest.fn(),
+    };
+
+    mirrorModel = {
+      findOne: jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue(null),
+      }),
+      find: jest.fn().mockReturnValue({
+        lean: jest.fn().mockResolvedValue([]),
+      }),
+    };
+
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        AnimeMetaService,
+        { provide: getModelToken(AnimeMeta.name), useValue: model },
+        { provide: getModelToken(AnimeMirror.name), useValue: mirrorModel },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn().mockReturnValue('https://api.jikan.moe/v4'),
+          },
+        },
+        {
+          provide: CACHE_MANAGER,
+          useValue: {
+            get: jest.fn().mockResolvedValue(undefined),
+            set: jest.fn().mockResolvedValue(true),
+          },
+        },
+        {
+          provide: BeeService,
+          useValue: {
+            getFreshMirror: jest.fn().mockResolvedValue(null),
+            enqueueGeneral: jest.fn().mockResolvedValue(undefined),
+            sampleSeasonalMirrorDocs: jest.fn().mockResolvedValue([]),
+          },
+        },
+      ],
+    }).compile();
+
+    svc = moduleRef.get(AnimeMetaService);
+  });
+
+  afterEach(() => {
+    // @ts-expect-error test-only cleanup
+    globalThis.fetch = undefined;
+    jest.restoreAllMocks();
+  });
+
+  it('当 AnimeMeta 已存在时：不触发 Jikan 调用', async () => {
+    const existing = {
+      malId,
+      title: 'Frieren',
+      imageUrl: 'x',
+      episodes: 28,
+      score: 9.1,
+      titleCn: '葬送的芙莉莲',
+    };
+    model.findOne.mockResolvedValue({
+      toJSON: () => existing,
+    });
+
+    const fetchSpy = jest.fn();
+    // @ts-expect-error node test environment mock
+    globalThis.fetch = fetchSpy;
+
+    const got = await svc.getOrFetchByMalId(malId);
+
+    expect(got).toEqual(existing);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(model.create).not.toHaveBeenCalled();
+  });
+
+  it('当 AnimeMeta 不存在时：抓取 Jikan 并写入缓存', async () => {
+    model.findOne.mockResolvedValue(null);
+
+    const fetchSpy = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: {
+          mal_id: malId,
+          title: 'Frieren',
+          episodes: 28,
+          score: 9.1,
+          images: { jpg: { image_url: 'https://cdn.example/cover.jpg' } },
+        },
+      }),
+    });
+    // @ts-expect-error node test environment mock
+    globalThis.fetch = fetchSpy;
+
+    model.create.mockResolvedValue({
+      toJSON: () => ({
+        id: 'doc1',
+        malId,
+        title: 'Frieren',
+        imageUrl: 'https://cdn.example/cover.jpg',
+        episodes: 28,
+        totalEpisodes: 28,
+        score: 9.1,
+      }),
+    });
+
+    const got = await svc.getOrFetchByMalId(malId);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(model.create).toHaveBeenCalledTimes(1);
+    expect(model.create).toHaveBeenCalledWith({
+      malId,
+      title: 'Frieren',
+      imageUrl: 'https://cdn.example/cover.jpg',
+      episodes: 28,
+      totalEpisodes: 28,
+      score: 9.1,
+      synopsis: undefined,
+      genres: undefined,
+    });
+    expect(got).toMatchObject({ malId, title: 'Frieren' });
+  });
+});

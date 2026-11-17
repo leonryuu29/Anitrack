@@ -1,0 +1,267 @@
+# AniTrack — anime progress, without spreadsheet energy
+
+**A full-stack anime tracking workspace built API-first with Next.js, NestJS, MongoDB, and contract tests.**
+
+[![Next.js](https://img.shields.io/badge/Next.js-App_Router-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+[![NestJS](https://img.shields.io/badge/NestJS-11-E0234E?logo=nestjs&logoColor=white)](https://nestjs.com/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI](https://github.com/leonryuu29/anitrack-portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/leonryuu29/anitrack-portfolio/actions/workflows/ci.yml)
+
+<p align="center">
+  <img src="Project_Intro/screenshots/Desktop-wide.png" alt="AniTrack desktop dashboard" width="78%">
+  <img src="Project_Intro/screenshots/Mobile-narrow.png" alt="AniTrack responsive mobile layout" width="18%">
+</p>
+
+**English:** AniTrack replaces a plain watchlist with a dashboard, searchable library,
+anime discovery, a Berlin-time seasonal timetable, bilingual metadata, and a
+GitHub-style activity heatmap. The backend exposes typed CRUD and aggregation
+APIs, documented with OpenAPI and checked by contract tests.
+
+**中文：** AniTrack 不只是“看番记录本”：它把清单、搜索、当季推荐、时间表、双语元数据和观影热力图放进一个完整的全栈应用，并用 OpenAPI、单元测试和契约测试约束前后端接口。
+
+> **Portfolio edition:** This repository is maintained by
+> [Leonryuu](https://github.com/leonryuu29). AniTrack began as a collaborative
+> course project; the original public development history remains available at
+> [IsanaNao/Anitrack](https://github.com/IsanaNao/Anitrack). See
+> [`UPSTREAM.md`](UPSTREAM.md) for provenance and licensing.
+
+## What the project demonstrates
+
+| Area | Evidence in this repository |
+|---|---|
+| Full-stack engineering | Next.js App Router UI, NestJS API, MongoDB/Mongoose persistence |
+| API-first design | Swagger/OpenAPI contract, layered DTOs, service/controller boundaries |
+| Data modelling | Separate public anime metadata from user-specific progress records |
+| Testing | Unit, integration, smoke, and contract-validation suites |
+| Third-party integration | Jikan, Bangumi, cache-aside metadata, and background mirroring |
+| Product thinking | Responsive library, timetable, ratings, rewatch history, activity heatmap |
+
+See the [architecture diagram](anitrack-visuals/figures/architecture.png) and
+[data-flow diagram](anitrack-visuals/figures/data-flow.png) for the system view.
+
+## Verification snapshot
+
+The portfolio fork was checked from a clean lockfile install on 2026-11-17:
+
+| Check | Result |
+|---|---|
+| Frontend unit tests | 5 passed |
+| Frontend integration test | 1 passed |
+| Frontend production build | passed |
+| Backend unit tests | 20 passed across 6 suites |
+| Backend production build | passed |
+| OpenAPI structure validation | passed |
+
+> **里程碑（2026-06-07）**：**课程内容要求已全部在仓库实现**（NestJS、API-first、CRUD、测试、薄前端、响应式）；**2026-05-21** 起已交付整站中/英 UI、Bangumi 映射、响应式布局；**2026-06-07** 增补 Mirror 当季 i18n 同步、当季推荐语言切换不 reshuffle、时间表多列 UI、Profile 热力图体验与月度强度阈值。**答辩文案与图示**见 `Project_Intro/` 与 `anitrack-visuals/`。登录多用户、时间表「零 TBD」等为**锦上添花**（§10.5）。
+>
+> **课程符合性（一句话）**：内容要求已满足；组织要求（三人 ×≈7 分钟、分工、Live-Demo）在答辩当天完成。
+
+## 🗂️ 仓库结构
+
+| 目录 | 说明 |
+|------|------|
+| `anitrack/` | Next.js 前端（`3000`） |
+| `anitrack/anitrack-backend/` | NestJS 后端（**主 API**，`3001`，Swagger `/api-docs`） |
+| `anitrack-tester/` | 契约测试与 HTTP 冒烟 |
+| `anitrack-visuals/` | 答辩用架构/技术栈图示（**英文** PNG/SVG，见 `figures/`） |
+| `Project_Intro/` | 答辩材料（`项目要求.md`、`演讲大纲.md`、`PPT文字稿大纲.md`、`答辩清单.md`） |
+| `PROJECT_BLUEPRINT.md` / `TASK_PROGRESS.md` | 设计总纲与进度（英文：`docs/en/`） |
+| `5-Anitrack/` | 课程提交：`openapi.json` + `Anitrack_sourcecode.zip` |
+
+## 🚀 项目愿景
+
+Anitrack 不仅仅是一个简单的“看番记录本”。它旨在通过自动化数据聚合提供深度的情感反馈：通过仿 GitHub 风格的“绿墙（Heatmap）”，将用户的观影行为转化为可视化的时间轨迹。
+
+## ✨ 核心特性（已实现）
+
+### 1) 健壮的后端逻辑（Logic-Heavy Backend）
+
+- **状态机约束**：严格校验番剧状态迁移（如：只有 `WATCHING` 或 `DROPPED` 可以转为 `COMPLETED`），防止非法数据入库。
+- **自动时间戳管理**：当番剧标记为“已完成”时，系统会自动维护 `completedDates` 数组，支持多周目（Rewatch）记录。
+- **高性能聚合查询**：使用 MongoDB Aggregation Pipeline 进行数据规范化与统计，后端直接输出带“强度值（Intensity）”的热力图 JSON（月度权重：**1→1，2–4→2，5–8→3，≥9→4**）。
+- **统计接口后端化**：
+  - `GET /api/stats/summary`：Profile/Dashboard 顶部指标（总量、完成数、在看数、平均评分、已看总集数）
+  - `GET /api/stats/activity?month=YYYY-MM`：月度 Activity（Added/Completed 列表），前端不再全量拉取再过滤
+  - `GET /api/anime-meta/seasonal-random`：Dashboard 当季推荐（MongoDB `$sample` / `AnimeMirror`，**不调用 Jikan**）；抽样优先已有 `titles.cn`；读路径 **同步 Bangumi 映射** 后返回全量多语言字段；卡片可点开 **`SeasonalPickDetailDialog`**
+  - `POST /api/anime-meta/mirror-i18n-sync`：客户端启动时后台补全 Mirror 当季池 Bangumi 映射（`MirrorI18nBootstrap`）
+- **Ownership 双表建模（阶段 3 关键底座）**：将番剧“客观元数据”与用户“个人进度”拆分为 `AnimeMeta`（公有缓存）与 `AnimeEntry`（用户私有），避免未来多用户场景的毁灭性重构。
+- **基于 `malId` 的 Cache-Aside 缓存层**：创建条目时按 `malId` 先查 `AnimeMeta`，未命中则抓取 Jikan 并缓存，降低第三方 API 压力与 429 风险。
+- **Jikan 请求缓存（24h）**：后端引入 NestJS `CacheModule`，所有 Jikan 三方请求统一走缓存，显著缓解 429。
+- **新番时间表（Timetable）**：**`/timetable`** — **多列横向滚动**（固定列宽，参考 animeko）；**柏林时区前后各 2 周**（`pastDays=14&futureDays=14`）；每列一天，列内全量条目 + 今天高亮；星期由前端 `formatWeekdayBerlin` 按 UI 语言显示。数据来自当季 **`AnimeMirror`**；星期以 Bangumi 为主、Jikan 广播字段兜底。**已知限制**：部分条目钟点仍为 **TBD**。
+- **整站双语（i18n）**：导航 **中文 / English**；作品标题/简介按 UI 语言择优（`pickAnimeTitle`，Bangumi `titleCn` 等）。**切换语言不重新随机当季推荐**（同一批 `malId`，只换显示字段）。清单老番 **后台 Bangumi 映射**（日志 `[i18n-map]`）；手动 **`POST /api/bee/map-mal-ids?malIds=...`**。见 **`PROJECT_BLUEPRINT.md` §7.5**。
+- **响应式（已完成）**：汉堡菜单、`AnimeCard` 紧凑模式、仪表盘双行横滑、档案热力图桌面 **16px** 格子 + 横向滚动、Dialog 移动端近全屏可滚动。见 **`TASK_PROGRESS.md` §4.11**。
+- **🐝 Intelligent Data Mirroring（Bee System）**：
+  - 内置后台同步引擎，以 **65s / 3 req** 的“礼貌频率”自动镜像 Jikan 元数据至 MongoDB（`AnimeMirror`）。
+  - 支持**断点续爬**与**被动抓取信号**：重启后基于 `lastUpdated` 继续同步，不会从头重复；读路径 miss 会 enqueue，后台逐步补齐热点数据。
+  - **多级优先级镜像**：`seasonal`（当季）＞ `top_1y`（Top40）＞ `top_5y`（Top100）＞ `top_all`（Top200）＞ `backfill`（季度回滚补漏），并通过 `tier/priority` 在数据库中持久化队列状态。
+  - **Mirror-first** 策略：Schedule、按 `malId` 补全元数据等路径优先走本地镜像；**Dashboard 当季推荐**使用 `GET /api/anime-meta/seasonal-random`，仅从 `AnimeMirror`（`tier=seasonal`）抽样，**该读路径不发起 Jikan HTTP**。
+  - 显著降低对三方 API 的依赖与 **429** 风险（配合 24h 缓存进一步加固）。
+
+### 2) 契约驱动开发（Contract-Driven）
+
+- **OpenAPI / Swagger 3.0**：仓库 **`anitrack/anitrack-backend/swagger.json`** 由 Nest 启动时加载；交互式文档 **`http://localhost:3001/api-docs`**。契约已包含 Bee **POST**（`seed-step` / `sync-step` / `bangumi-map`）；冒烟按 OpenAPI **声明的 HTTP 方法**请求（见 **`PROJECT_BLUEPRINT.md` §3.9.12**）。
+- **多层级测试套件**：
+  - **Vitest 单元测试**：覆盖核心算法与日期计算
+  - **集成测试**：验证 API 与 MongoDB 的真实交互
+  - **契约回归测试**：在契约冒烟**已声明的路径与字段范围内**，校验实现与 `swagger.json` 一致（详见 `anitrack-tester/contract-validator`；POST-only 端点见 Blueprint）
+
+### 3) 工程化工具集
+
+- **自动化播种机（Seeder）**：一键填充测试数据，快速模拟真实使用场景。
+- **严格规范化**：处理 BSON `Date` 与 `String` 的混合存储问题，确保时区一致性（默认 `Europe/Berlin`）。
+
+## 🛠 技术栈
+
+- **Frontend**: Next.js (App Router), Tailwind CSS
+- **Backend**: NestJS 11, Mongoose, Swagger (OpenAPI 3.0)
+- **Database**: MongoDB Atlas
+- **Validation**: class-validator / class-transformer（NestJS）
+- **Testing**: Vitest, AJV (JSON Schema Validation)
+- **Docs**: Swagger (OpenAPI 3.0)
+
+## 📅 路线图（Roadmap）
+
+- [x] 阶段 1：核心 Watchlist CRUD 与数据库持久化
+- [x] 阶段 2：统计聚合逻辑与多维自动化测试
+- [x] 阶段 3：Jikan 影子库缓存（`AnimeMeta`）+ 前端主界面开发（Dashboard/The Pulse、Profile Heatmap、Library Dialog）
+- [x] 阶段 4：**`/timetable`** 多列横向 UI + **`GET /api/anime-meta/timetable`**；Dashboard 当季推荐、Mirror i18n 与 **`SeasonalPickDetailDialog`**
+- [x] 阶段 5（体验）：**整站双语**（`TASK_PROGRESS.md` **§4.9**）
+- [x] 阶段 5+（体验）：**响应式布局**（`TASK_PROGRESS.md` **§4.11**）
+- [ ] 阶段 6+（**可选**）：**Auth 与多用户**；推荐个性化；Timetable 数据「零 TBD」专项 — 见 **`PROJECT_BLUEPRINT.md` §10.5**
+
+### 后续增量（非课程硬性）
+
+| 优先级 | 方向 |
+|--------|------|
+| 性价比高 | Timetable 页脚对 **TBD / 未映射** 的说明 |
+| 按需 | URL 级 locale（`/en/...`）、设计系统、动效、无障碍 |
+| 建议谨慎或搁置 | 并行做 **纯 Jikan 周视图 Schedule 全站**；追求 **零 TBD 排钟** 而无稳定数据源 |
+
+---
+
+## 📌 答辩准备（Präsentation + Live-Demo）
+
+> **课程符合性（一句话）**：Anitrack 已满足 Web-Technologies I 全部**内容要求**（NestJS、API-first、CRUD、测试、薄前端、响应式）；**组织要求**（三人 ×≈7 分钟、分工、Live-Demo）在答辩当天完成。
+> 详细状态见 **`TASK_PROGRESS.md` §0**；课程要求对照 **`Project_Intro/项目要求.md`**；排练 **`Project_Intro/答辩清单.md`**。
+
+| 材料 | 状态 | 路径 |
+|------|------|------|
+| 课程要求（德+中） | 已就绪 | `Project_Intro/项目要求.md` |
+| PPT 大纲 / 演讲稿 | 已就绪（中文为主） | `Project_Intro/演讲大纲.md`、`PPT文字稿大纲.md` |
+| 排练清单 | 已就绪 | `Project_Intro/答辩清单.md` |
+| 图示（英文） | 已导出 | `anitrack-visuals/figures/` |
+| Swagger | 仓库已有，答辩展示 UI | `http://localhost:3001/api-docs` |
+| 实际 PPT | **已生成** | `Project_Intro/slides/Anitrack_Defense.pptx` |
+| 截图 | **待插入** | `Project_Intro/screenshots/` → PPT 第 7/12 页 |
+| 课程提交包 | **已生成** | `5-Anitrack/openapi.json`、`5-Anitrack/Anitrack_sourcecode.zip` |
+| 教授用英文文档 | **已生成** | `docs/en/README.md`、`PROJECT_BLUEPRINT.md`、`TASK_PROGRESS.md` |
+
+答辩时：**幻灯片与 Live-Demo 界面请用 English**（App 内语言切换器）。PPT 需**导出 PDF** 单独提交。
+
+---
+
+## 🛠 快速开始（给队友）
+
+### 1) 克隆并安装
+
+```bash
+git clone https://github.com/leonryuu29/anitrack-portfolio.git
+cd anitrack-portfolio
+```
+
+> 提示：仓库根目录（也就是你现在所在的 `Anitrack/`）**没有** `package.json`，不能在这里直接 `npm run dev`。
+> 前端与后端分别在 `Anitrack/anitrack/` 与 `Anitrack/anitrack/anitrack-backend/`。
+
+### 2) 环境配置
+
+在 `anitrack/anitrack-backend/` 目录创建 `.env`（**该文件已在 `.gitignore` 中忽略，不会上传到 GitHub**）：
+
+```plaintext
+MONGODB_URI=你的MongoDB连接字符串
+JIKAN_BASE_URL=https://api.jikan.moe/v4
+SYNC_ENABLED=true
+# 可选：控制 Bee 启动时/重试时播种哪些 Top 队列（避免频繁触发 429）
+# 例：只跑 Top100/Top200：top_5y,top_all
+BEE_ENABLED_TOP_TIERS=top_1y,top_5y,top_all
+# 可选：礼貌爬取标识
+JIKAN_USER_AGENT=AnitrackBee/1.0 (+contact=you@example.com)
+```
+
+### 3) 启动开发服务器
+
+```bash
+# 终端 1：启动后端（NestJS），端口 3001
+cd anitrack/anitrack-backend
+npm install
+npm run start:dev
+
+# 终端 2：启动前端（Next.js），端口 3000
+cd ..
+npm install
+npm run dev
+```
+
+- **Swagger UI（新后端）**：`http://localhost:3001/api-docs`
+- **OpenAPI JSON（契约测试读取）**：`http://localhost:3001/swagger.json`
+- **前端页面（Next.js）**：`http://localhost:3000/`
+
+## 🧪 测试指令
+
+```bash
+# 算法单测
+npm test
+
+# 集成测试
+npm run test:integration
+```
+
+## 🧾 契约校验（Contract Test）
+
+前置条件：保持后端（`anitrack/anitrack-backend/`）开发服务器开启（默认 `3001`）。
+
+在另一个终端执行：
+
+```bash
+cd ../anitrack-tester/contract-validator
+node run-contract-test.js
+```
+## 关于小蜜蜂系统
+### 429 限流后的“下次怎么继续”（Runbook）
+
+当启动或手动触发播种时，如果看到：
+
+- `seed failed (...): status=429 code=UPSTREAM_RATE_LIMIT ...`
+
+说明 Jikan 限流了。此时 Bee 会进入**退避窗口**（backoff），并把下一次允许播种的时间写入 `backoffUntil`。
+
+#### 1) 查看当前镜像进度与 backoff
+
+仪表盘式查询爬取进程可以通过：
+```PowerShell
+curl.exe -s http://localhost:3001/api/bee/status
+```
+
+你会拿到类似：
+
+- `tiers.top_5y.total` / `tiers.top_all.total`：是否已经成功播种进队列（未播种时 total=0）
+- `backoffUntil`：若 >0 表示在该时间点之前不要继续触发 seed（否则大概率继续 429）
+
+#### 2) 等 backoff 结束后，手动触发一次播种（轻量、只播种一档）
+
+```PowerShell
+curl.exe -s -X POST http://localhost:3001/api/bee/seed-step
+```
+
+手动触发一次同步 batch（默认 3 条）
+```PowerShell
+curl.exe -s -X POST "http://localhost:3001/api/bee/sync-step?batchSize=3"
+```
+
+它们都会返回一份新的进度快照（和 `/api/bee/status` 一样）。
+
+#### 你应该看到什么（成功信号）
+- `top_5y.total` 变为 **100**，`top_all.total` 变为 **200**（说明队列已播种）
+- 随后后端日志会出现类似：
+  - `[Mirror] Synced 3 this tick (top_5y=3) ... progress=...`
+  - `[Mirror] Synced 3 this tick (top_all=3) ... progress=...`

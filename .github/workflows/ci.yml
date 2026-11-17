@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: anitrack
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: anitrack/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run test:integration
+      - run: npm run build
+
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: anitrack/anitrack-backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: anitrack/anitrack-backend/package-lock.json
+      - run: npm ci
+      - run: npm test -- --runInBand
+      - run: npm run build
